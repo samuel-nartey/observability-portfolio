@@ -1,0 +1,69 @@
+groups:
+  - name: notes-app-alerts
+    rules:
+
+      # ── App Down ────────────────────────────────────────────────────────────
+      # up == 0 means Prometheus cannot reach /metrics on the app.
+      # for: 30s — must be down for 30 continuous seconds before firing.
+      # When the app comes back up, AlertManager sends a "resolved" notification.
+      - alert: AppDown
+        expr: up{job="notes-app"} == 0
+        for: 30s
+        labels:
+          severity: critical
+        annotations:
+          summary: "Notes App is DOWN"
+          description: "notes-app is unreachable. Run: docker compose ps"
+
+      # ── App Back Up (informational) ─────────────────────────────────────────
+      # This is handled automatically by AlertManager's send_resolved: true.
+      # When AppDown stops firing, ntfy gets a green "resolved" notification.
+      # No extra rule needed here.
+
+      # ── 404 Errors ──────────────────────────────────────────────────────────
+      # Only fire when 404s are ACTIVELY happening right now.
+      # for: 1m prevents a single stray 404 from spamming notifications.
+      - alert: NotFoundErrors
+        expr: rate(http_404_errors_total[2m]) > 0
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "404 Errors on Notes App"
+          description: "404 Not Found errors are actively occurring on notes-app."
+
+      # ── High 5xx Error Rate ─────────────────────────────────────────────────
+      - alert: HighErrorRate
+        expr: |
+          sum(rate(http_requests_total{status_code=~"5.."}[5m]))
+          /
+          sum(rate(http_requests_total[5m])) > 0.1
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High 5xx Error Rate on Notes App"
+          description: "More than 10% of requests are returning 5xx server errors."
+
+      # ── Slow Responses ──────────────────────────────────────────────────────
+      - alert: SlowResponses
+        expr: |
+          histogram_quantile(0.95,
+            rate(http_request_duration_seconds_bucket[5m])
+          ) > 1
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Notes App Responding Slowly"
+          description: "95th percentile response time is above 1 second."
+
+      # ── High Memory ─────────────────────────────────────────────────────────
+      - alert: HighMemoryUsage
+        expr: process_resident_memory_bytes > 200 * 1024 * 1024
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Notes App High Memory Usage"
+          description: "App is using more than 200MB of memory."

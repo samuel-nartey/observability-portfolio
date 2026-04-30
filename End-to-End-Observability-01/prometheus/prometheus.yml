@@ -1,0 +1,25 @@
+global:
+  scrape_interval: 15s       # How often Prometheus collects metrics
+  evaluation_interval: 15s   # How often it evaluates alert rules
+
+# Tell Prometheus where AlertManager is running
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - alertmanager:9093
+
+# Load our alert rules file
+rule_files:
+  - "/etc/prometheus/alert_rules.yml"
+
+# Targets to scrape (collect metrics from)
+scrape_configs:
+  - job_name: "notes-app"
+    static_configs:
+      - targets: ["app:8000"]
+    metrics_path: /metrics
+
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["localhost:9090"]
